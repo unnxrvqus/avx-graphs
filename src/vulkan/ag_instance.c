@@ -17,7 +17,7 @@ VkApplicationInfo app_info = {
     .apiVersion = VK_API_VERSION_1_4,
 };
 
-AgDevice gDevice;
+AgApplication gApplication;
 
 uint32_t ag_find_queue_family(
     VkQueueFamilyProperties *queueFamilies, 
@@ -32,12 +32,13 @@ uint32_t ag_find_queue_family(
     }
 }
 
-AgDevice* ag_get_device() {
-    return &gDevice;
+AgApplication* ag_get_app_instance() {
+    return &gApplication;
 }
 
-void ag_create_instance() {
-    
+AgApplication* ag_create_app_instance() {
+    gApplication.surface = malloc(sizeof(AgSurface*));
+
     ag_log("Initializing Vulkan...");
 
     const char* instanceExtensions[] = {
@@ -60,12 +61,12 @@ void ag_create_instance() {
     VkResult result = vkCreateInstance(
         &createInfo,
         NULL,
-        &gDevice.instance
+        &gApplication.instance
     );
 
     if(result != VK_SUCCESS) {
         printf("Something went wrong...\n");
-        return;
+        return NULL;
     }
     
     ag_log("Vulkan instance created");
@@ -73,14 +74,14 @@ void ag_create_instance() {
     // Get count of avaiable GPUs
     uint32_t deviceCount = 0;
     result = vkEnumeratePhysicalDevices(
-        gDevice.instance,
+        gApplication.instance,
         &deviceCount,
         NULL
     );
 
     if(result != VK_SUCCESS || deviceCount == 0) {
         printf("Something went wrong...\n");\
-        return; //TODO: free memory for g_instance
+        return NULL; //TODO: free memory for g_instance
     }
 
     ag_log("Avaiable GPUs: %d", deviceCount);
@@ -89,17 +90,17 @@ void ag_create_instance() {
     
     // Get array of avaiable GPUs
     result = vkEnumeratePhysicalDevices(
-        gDevice.instance,
+        gApplication.instance,
         &deviceCount,
         devices
     );
     
-    gDevice.physical = devices[0];
+    gApplication.physical = devices[0];
 
     VkPhysicalDeviceProperties properties;
     // Get GPU properties
     vkGetPhysicalDeviceProperties(
-        gDevice.physical,
+        gApplication.physical,
         &properties
     );
 
@@ -108,7 +109,7 @@ void ag_create_instance() {
     // Get amount of avaiable queue families on that GPU
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
-        gDevice.physical,
+        gApplication.physical,
         &queueFamilyCount,
         NULL
     );
@@ -116,27 +117,27 @@ void ag_create_instance() {
     // Fill array of queue family properties 
     VkQueueFamilyProperties *queueFamilies = malloc(sizeof(VkQueueFamilyProperties) * queueFamilyCount); 
     vkGetPhysicalDeviceQueueFamilyProperties(
-        gDevice.physical,
+        gApplication.physical,
         &queueFamilyCount,
         queueFamilies
     );
 
     // Find family with graphics commands avaiable
-    gDevice.graphicsFamilyIndex = AG_QUEUE_FAMILY_INVALID;
-    gDevice.graphicsFamilyIndex = ag_find_queue_family(queueFamilies, queueFamilyCount, VK_QUEUE_GRAPHICS_BIT);
+    gApplication.graphicsFamilyIndex = AG_QUEUE_FAMILY_INVALID;
+    gApplication.graphicsFamilyIndex = ag_find_queue_family(queueFamilies, queueFamilyCount, VK_QUEUE_GRAPHICS_BIT);
 
-    if(gDevice.graphicsFamilyIndex == AG_QUEUE_FAMILY_INVALID) {
+    if(gApplication.graphicsFamilyIndex == AG_QUEUE_FAMILY_INVALID) {
         printf("Something went wrong...\n");
-        return;
+        return NULL;
     }
 
-    ag_log("Graphics queue family: %d", gDevice.graphicsFamilyIndex);
+    ag_log("Graphics queue family: %d", gApplication.graphicsFamilyIndex);
 
     // Describe queue creation info
     float queuePriority = 1.0f;
     VkDeviceQueueCreateInfo queueInfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = gDevice.graphicsFamilyIndex,
+        .queueFamilyIndex = gApplication.graphicsFamilyIndex,
         .queueCount = 1,
         .pQueuePriorities = &queuePriority
     };
@@ -154,29 +155,30 @@ void ag_create_instance() {
 
     // Create logical device
     result = vkCreateDevice(
-        gDevice.physical,
+        gApplication.physical,
         &deviceInfo,
         NULL,
-        &gDevice.logical
+        &gApplication.logical
     );
 
     ag_log("Logical device created");
 
     if(result != VK_SUCCESS) {
         printf("Something went wrong...\n");
-        return;
+        return NULL;
     }
 
     // Finaly get queue with graphics commands avaiable
     vkGetDeviceQueue(
-        gDevice.logical,
-        gDevice.graphicsFamilyIndex,
+        gApplication.logical,
+        gApplication.graphicsFamilyIndex,
         0,
-        &gDevice.graphicsQueue
+        &gApplication.graphicsQueue
     );
 
     ag_log("Graphics queue acquired");
 
     ag_log("Vulkan initialized successfully");
-}
 
+    return &gApplication;
+}

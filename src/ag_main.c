@@ -5,10 +5,11 @@
 #include <windows.h>
 
 int main(void) {
-    ag_create_instance();
-
+    AgApplication *app = ag_create_app_instance();
+    
     ag_create_surface();
 
     ag_create_swapchain();
+
     return 0;
 }

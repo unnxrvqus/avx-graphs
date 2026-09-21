@@ -6,6 +6,133 @@
 #include "vulkan/ag_swapchain.h"
 #include "ag_log.h"
 
+AgSwapchain gSwapchain = {
+    .imageCount = 0,
+    .images = NULL,
+    .swapchain = 0,
+    .format = 0,
+    .presentMode = 0
+};
+
+AgSwapchain* ag_get_swapchain() {
+    return &gSwapchain;
+}
+
+VkResult ag_create_swapchain_image_views(
+    AgApplication *application
+) {
+    for (uint32_t i = 0; i < gSwapchain.imageCount; i++) {
+
+        VkImageViewCreateInfo info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+
+            .image = gSwapchain.images[i],
+
+            .viewType = VK_IMAGE_VIEW_TYPE_2D,
+
+            .format = gSwapchain.format.format,
+
+            .components = {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY
+            },
+
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+
+                .baseMipLevel = 0,
+                .levelCount = 1,
+
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            }
+        };
+
+        VkResult result = vkCreateImageView(
+            application->logical,
+            &info,
+            NULL,
+            &gSwapchain.imageViews[i]
+        );
+
+        if (result != VK_SUCCESS) {
+            ag_log("Failed to create swapchain image view");
+            return result;
+        }
+    }
+
+    ag_log("Swapchain image views created");
+
+    return VK_SUCCESS;
+}
+
+
+void ag_aquire_images() {
+
+    VkResult result = vkGetSwapchainImagesKHR(
+        ag_get_app_instance()->logical,
+        gSwapchain.swapchain,
+        &gSwapchain.imageCount,
+        NULL
+    );
+
+    if (result != VK_SUCCESS) {
+        ag_log(
+            "Failed to get swapchain image count: %d",
+            result
+        );
+        return;
+    }
+
+    ag_log(
+        "Swapchain image count: %u",
+        gSwapchain.imageCount
+    );
+    
+    gSwapchain.images = malloc(sizeof(VkImage) * gSwapchain.imageCount);
+
+    if (gSwapchain.images == NULL) {
+        ag_log("Failed to allocate swapchain images");
+        return;
+    }
+
+    result = vkGetSwapchainImagesKHR(
+        ag_get_app_instance()->logical,
+        gSwapchain.swapchain,
+        &gSwapchain.imageCount,
+        gSwapchain.images
+    );
+
+    if (result != VK_SUCCESS) {
+        ag_log(
+            "Failed to get swapchain images: %d",
+            result
+        );
+
+        free(gSwapchain.images);
+        return;
+    }
+
+    for (uint32_t i = 0; i < gSwapchain.imageCount; i++) {
+    
+        ag_log(
+            "Swapchain image %u: %p",
+            i,
+            (void *)gSwapchain.images[i]
+        );
+
+        gSwapchain.imageViews = malloc(sizeof(VkImageView) * gSwapchain.imageCount);
+    
+    }
+
+    result = ag_create_swapchain_image_views(
+        ag_get_app_instance()
+    );
+
+}
+
 VkSurfaceFormatKHR ag_choose_surface_format(
     VkSurfaceFormatKHR *formats,
     uint32_t count,
@@ -41,14 +168,13 @@ VkPresentModeKHR ag_choose_present_mode(
 void ag_create_swapchain() {
     VkResult result;
 
-    AgDevice *device = ag_get_device();
-    AgSurface *surface = ag_get_surface();
+    AgApplication *app = ag_get_app_instance();
     
     // Get amount of avaiable surface formats
     uint32_t surfaceFormatCount = UINT32_MAX;
     vkGetPhysicalDeviceSurfaceFormatsKHR(
-        device->physical,
-        surface->surface,
+        app->physical,
+        app->surface->surface,
         &surfaceFormatCount,
         NULL
     );
@@ -56,8 +182,8 @@ void ag_create_swapchain() {
     // Get avaiable formats
     VkSurfaceFormatKHR surfaceFormats[surfaceFormatCount];
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        device->physical,
-        surface->surface,
+        app->physical,
+        app->surface->surface,
         &surfaceFormatCount,
         surfaceFormats
     );
@@ -78,8 +204,8 @@ void ag_create_swapchain() {
     // Get amount of avaiable present modes
     uint32_t presentModeCount = 0;
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device->physical,
-        surface->surface,
+        app->physical,
+        app->surface->surface,
         &presentModeCount,
         NULL
     );
@@ -92,8 +218,8 @@ void ag_create_swapchain() {
     // Get avaiable present modes
     VkPresentModeKHR presentModes[presentModeCount];
     vkGetPhysicalDeviceSurfacePresentModesKHR(
-        device->physical,
-        surface->surface,
+        app->physical,
+        app->surface->surface,
         &presentModeCount,
         presentModes
     );
@@ -107,8 +233,8 @@ void ag_create_swapchain() {
     // Get current surface capabilities
     VkSurfaceCapabilitiesKHR capabilities;
     result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        device->physical,
-        surface->surface,
+        app->physical,
+        app->surface->surface,
         &capabilities
     );
 
@@ -136,7 +262,7 @@ void ag_create_swapchain() {
     VkSwapchainCreateInfoKHR createInfo = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         
-        .surface = surface->surface,
+        .surface = app->surface->surface,
 
         .minImageCount = capabilities.minImageCount,
 
@@ -165,7 +291,7 @@ void ag_create_swapchain() {
     VkSwapchainKHR swapchain;
 
     result = vkCreateSwapchainKHR(
-        device->logical,
+        app->logical,
         &createInfo,
         NULL,
         &swapchain
@@ -176,4 +302,13 @@ void ag_create_swapchain() {
     }
 
     ag_log("Swapchain created");
+
+    gSwapchain.swapchain = swapchain;
+
+    gSwapchain.format = chosenFormat;
+    gSwapchain.presentMode = chosenPresentMode;
+
+    ag_aquire_images();
+
+    app->swapchain = &gSwapchain;
 }

@@ -8,35 +8,37 @@
 #include "ag_log.h"
 
 
-AgSurface surface = {
+AgSurface gSurface = {
     .width = 0,
     .height = 0,
     .window = NULL,
-    .surface = 0
+    .surface = 0,
 };
 
 AgSurface* ag_get_surface() {
-    return &surface;
+    return &gSurface;
 }
 
 void ag_create_surface() {
-    surface.window = ag_create_window("AvxGraphs", 1920, 1080);
-    AgDevice* device = ag_get_device();
+    
+    gSurface.window = ag_create_window("AvxGraphs", 1920, 1080);
+
+    AgApplication* app = ag_get_app_instance();
     VkResult result;
 
     VkWin32SurfaceCreateInfoKHR surfaceInfo = {
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .hwnd = surface.window->handle,
-        .hinstance = (HINSTANCE) surface.window->appInstance,
-        .hwnd = (HWND) surface.window->handle
+        .hwnd = gSurface.window->handle,
+        .hinstance = (HINSTANCE) gSurface.window->appInstance,
+        .hwnd = (HWND) gSurface.window->handle
     };
 
     // Create surface to which we can draw
     result = vkCreateWin32SurfaceKHR(
-        device->instance,
+        app->instance,
         &surfaceInfo,
         NULL,
-        &surface.surface
+        &gSurface.surface
     );
 
     if(result != VK_SUCCESS) {
@@ -47,9 +49,9 @@ void ag_create_surface() {
     // Check if current graphics queue supports present
     VkBool32 presentSupported;
     vkGetPhysicalDeviceSurfaceSupportKHR(
-        device->physical,
-        device->graphicsFamilyIndex,
-        surface.surface,
+        app->physical,
+        app->graphicsFamilyIndex,
+        gSurface.surface,
         &presentSupported
     );
     
@@ -59,6 +61,8 @@ void ag_create_surface() {
         return;
     }
 
-    device->presentFamilyIndex = device->graphicsFamilyIndex;
+    app->presentFamilyIndex = app->graphicsFamilyIndex;
     ag_log("Surface created successfully");
+
+    app->surface = &gSurface;
 };
