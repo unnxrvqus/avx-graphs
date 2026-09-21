@@ -1,38 +1,182 @@
 #include <vulkan/vulkan.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "vulkan/ag_app_info.h"
+#include "vulkan/ag_instance.h"
+#include "ag_log.h"
+#include "ag_platform_headers.h"
 
-typedef enum agPlatformType {
-    AG_WINDOWS,
-    AG_LINUX
-} agPlatformType;
+#define AG_QUEUE_FAMILY_INVALID UINT32_MAX
 
-VkInstance g_instance;
+VkApplicationInfo app_info = {
+    .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    .pApplicationName = "AvxGraphs", //TODO: remove hard-coded name of framework
+    .applicationVersion = VK_MAKE_VERSION(0, 1, 0), //TODO: remove hard-coded version of framework
+    .pEngineName = "AvxGraphs",
+    .engineVersion = VK_MAKE_VERSION(0, 1, 0), //TODO:: ??
+    .apiVersion = VK_API_VERSION_1_4,
+};
 
-void ag_create_instance(agPlatformType platformType) {
+AgDevice gDevice;
+
+uint32_t ag_find_queue_family(
+    VkQueueFamilyProperties *queueFamilies, 
+    uint32_t queueFamilyCount, 
+    uint32_t requiredFlags
+) {
+    for(uint32_t i = 0; i < queueFamilyCount; i++) {
+
+        if((queueFamilies[i].queueFlags & requiredFlags) == requiredFlags) {
+            return i;
+        }
+    }
+}
+
+AgDevice* ag_get_device() {
+    return &gDevice;
+}
+
+void ag_create_instance() {
     
-    VkInstanceCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pApplicationInfo = &app_info
+    ag_log("Initializing Vulkan...");
+
+    const char* instanceExtensions[] = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+
+#ifdef AG_PLATFORM_WINDOWS
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#endif
+
     };
 
+    VkInstanceCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pApplicationInfo = &app_info,
+        .enabledExtensionCount = 2, //TODO: For now we pass it as-is, but should be controlled in future
+        .ppEnabledExtensionNames = instanceExtensions
+    };
+
+    // Create instance of Vulkan App
     VkResult result = vkCreateInstance(
-        &create_info,
+        &createInfo,
         NULL,
-        &g_instance
+        &gDevice.instance
     );
 
     if(result != VK_SUCCESS) {
         printf("Something went wrong...\n");
+        return;
     }
     
-}
+    ag_log("Vulkan instance created");
 
-int main(void) {
-    ag_create_instance(AG_WINDOWS);
+    // Get count of avaiable GPUs
+    uint32_t deviceCount = 0;
+    result = vkEnumeratePhysicalDevices(
+        gDevice.instance,
+        &deviceCount,
+        NULL
+    );
 
-    printf("Everything is fine!\n");
+    if(result != VK_SUCCESS || deviceCount == 0) {
+        printf("Something went wrong...\n");\
+        return; //TODO: free memory for g_instance
+    }
+
+    ag_log("Avaiable GPUs: %d", deviceCount);
+
+    VkPhysicalDevice devices[deviceCount];
     
-    return 0;
+    // Get array of avaiable GPUs
+    result = vkEnumeratePhysicalDevices(
+        gDevice.instance,
+        &deviceCount,
+        devices
+    );
+    
+    gDevice.physical = devices[0];
+
+    VkPhysicalDeviceProperties properties;
+    // Get GPU properties
+    vkGetPhysicalDeviceProperties(
+        gDevice.physical,
+        &properties
+    );
+
+    ag_log("Selected GPU: %s", properties.deviceName);
+
+    // Get amount of avaiable queue families on that GPU
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        gDevice.physical,
+        &queueFamilyCount,
+        NULL
+    );
+    
+    // Fill array of queue family properties 
+    VkQueueFamilyProperties *queueFamilies = malloc(sizeof(VkQueueFamilyProperties) * queueFamilyCount); 
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        gDevice.physical,
+        &queueFamilyCount,
+        queueFamilies
+    );
+
+    // Find family with graphics commands avaiable
+    gDevice.graphicsFamilyIndex = AG_QUEUE_FAMILY_INVALID;
+    gDevice.graphicsFamilyIndex = ag_find_queue_family(queueFamilies, queueFamilyCount, VK_QUEUE_GRAPHICS_BIT);
+
+    if(gDevice.graphicsFamilyIndex == AG_QUEUE_FAMILY_INVALID) {
+        printf("Something went wrong...\n");
+        return;
+    }
+
+    ag_log("Graphics queue family: %d", gDevice.graphicsFamilyIndex);
+
+    // Describe queue creation info
+    float queuePriority = 1.0f;
+    VkDeviceQueueCreateInfo queueInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = gDevice.graphicsFamilyIndex,
+        .queueCount = 1,
+        .pQueuePriorities = &queuePriority
+    };
+
+    const char* deviceExtensions[] = { "VK_KHR_swapchain" };
+
+    // Describe logical device creation info
+    VkDeviceCreateInfo deviceInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &queueInfo,
+        .enabledExtensionCount = 1,
+        .ppEnabledExtensionNames = deviceExtensions
+    };
+
+    // Create logical device
+    result = vkCreateDevice(
+        gDevice.physical,
+        &deviceInfo,
+        NULL,
+        &gDevice.logical
+    );
+
+    ag_log("Logical device created");
+
+    if(result != VK_SUCCESS) {
+        printf("Something went wrong...\n");
+        return;
+    }
+
+    // Finaly get queue with graphics commands avaiable
+    vkGetDeviceQueue(
+        gDevice.logical,
+        gDevice.graphicsFamilyIndex,
+        0,
+        &gDevice.graphicsQueue
+    );
+
+    ag_log("Graphics queue acquired");
+
+    ag_log("Vulkan initialized successfully");
 }
+
