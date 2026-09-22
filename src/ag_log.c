@@ -47,7 +47,7 @@ const char* ag_uptime(void) {
     return buffer;
 }
 
-void ag_log(const char* format, ...) {
+void agLog(const char* format, ...) {
     va_list args;
 
     printf("[AvxGraphs] [%s] ", ag_uptime());

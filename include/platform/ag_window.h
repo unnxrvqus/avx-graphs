@@ -12,6 +12,6 @@ typedef struct AgWindow {
     void* (*event_handler)(void* userdata);
 } AgWindow;
 
-AgWindow* ag_create_window(const char* title, uint32_t w, uint32_t h);
+AgWindow* agCreateWindow(const char* title, uint32_t w, uint32_t h);
 
 #endif // ag_window_h

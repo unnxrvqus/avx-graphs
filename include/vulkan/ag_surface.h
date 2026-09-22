@@ -9,13 +9,13 @@
 typedef struct AgSurfaceData AgSurfaceData;
 
 typedef struct AgSurface {
-    VkSurfaceKHR surface;
+    VkSurfaceKHR handle;
     AgWindow* window;
     uint32_t width;
     uint32_t height;
 } AgSurface;
 
-void ag_create_surface();
-AgSurface* ag_get_surface();
+void agCreateSurface();
+AgSurface* agGetSurfaceInstance();
 
 #endif // ag_surface_h

@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 
 typedef struct AgSwapchain {
-    VkSwapchainKHR swapchain;
+    VkSwapchainKHR handle;
     VkPresentModeKHR presentMode;
     VkSurfaceFormatKHR format;
     VkImage* images;
@@ -14,7 +14,7 @@ typedef struct AgSwapchain {
     uint32_t imageCount;
 } AgSwapchain;
 
-void ag_create_swapchain();
-AgSwapchain* ag_get_swapchain();
+void agCreateSwapchain();
+AgSwapchain* agGetSwapchainIsntance();
 
 #endif // ag_swapchain_h

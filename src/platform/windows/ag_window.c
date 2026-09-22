@@ -3,7 +3,7 @@
 
 #include "platform/ag_window.h"
 
-LRESULT CALLBACK ag_window_proc(
+LRESULT CALLBACK _agWindowProc(
     HWND hwnd,
     UINT message,
     WPARAM wParam,
@@ -24,7 +24,7 @@ LRESULT CALLBACK ag_window_proc(
     );
 }
 
-AgWindow* ag_create_window(
+AgWindow* agCreateWindow(
     const char *title,
     uint32_t width,
     uint32_t height
@@ -33,7 +33,7 @@ AgWindow* ag_create_window(
 
     // Register window class
     WNDCLASS windowClass = {
-        .lpfnWndProc = ag_window_proc,
+        .lpfnWndProc = _agWindowProc,
         .hInstance = GetModuleHandle(NULL),
         .lpszClassName = className
     };

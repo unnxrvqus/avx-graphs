@@ -8,29 +8,29 @@
 #include "ag_log.h"
 
 
-AgSurface gSurface = {
+AgSurface _surface = {
     .width = 0,
     .height = 0,
     .window = NULL,
-    .surface = 0,
+    .handle = 0,
 };
 
-AgSurface* ag_get_surface() {
-    return &gSurface;
+AgSurface* agGetSurfaceInstance() {
+    return &_surface;
 }
 
-void ag_create_surface() {
+void agCreateSurface() {
     
-    gSurface.window = ag_create_window("AvxGraphs", 1920, 1080);
+    _surface.window = agCreateWindow("AvxGraphs", 1920, 1080);
 
-    AgApplication* app = ag_get_app_instance();
+    AgApplication* app = agGetAppInstance();
     VkResult result;
 
     VkWin32SurfaceCreateInfoKHR surfaceInfo = {
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .hwnd = gSurface.window->handle,
-        .hinstance = (HINSTANCE) gSurface.window->appInstance,
-        .hwnd = (HWND) gSurface.window->handle
+        .hwnd = _surface.window->handle,
+        .hinstance = (HINSTANCE) _surface.window->appInstance,
+        .hwnd = (HWND) _surface.window->handle
     };
 
     // Create surface to which we can draw
@@ -38,7 +38,7 @@ void ag_create_surface() {
         app->instance,
         &surfaceInfo,
         NULL,
-        &gSurface.surface
+        &_surface.handle
     );
 
     if(result != VK_SUCCESS) {
@@ -49,20 +49,20 @@ void ag_create_surface() {
     // Check if current graphics queue supports present
     VkBool32 presentSupported;
     vkGetPhysicalDeviceSurfaceSupportKHR(
-        app->physical,
+        app->physical_device,
         app->graphicsFamilyIndex,
-        gSurface.surface,
+        _surface.handle,
         &presentSupported
     );
     
     if(presentSupported == VK_FALSE) {
         // Present is not supported, shit...
-        ag_log("Current queue does not support presentation to surface");
+        agLog("Current queue does not support presentation to surface");
         return;
     }
 
     app->presentFamilyIndex = app->graphicsFamilyIndex;
-    ag_log("Surface created successfully");
+    agLog("Surface created successfully");
 
-    app->surface = &gSurface;
+    app->surface = &_surface;
 };
